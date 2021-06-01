@@ -1,0 +1,58 @@
+version: "3.9"
+
+networks:
+  loki:
+
+services:
+  loki:
+    image: grafana/loki:2.0.0
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - loki
+
+  fluent-bit:
+    image: grafana/fluent-bit-plugin-loki:latest
+    ports: 
+      - "24224:24224"
+    environment:
+      - LOKI_URL=http://loki:3100/loki/api/v1/push
+    volumes:
+      - ./fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+    networks:
+      - loki
+
+  go-app:
+    image: go-prom:latest
+    ports: 
+      - "8080:8080"
+    networks:
+      - loki
+    depends_on: 
+      - fluent-bit
+    logging:
+      driver: fluentd
+      options:
+        tag: go-app
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    command: --config.file=/etc/prometheus/prometheus.yaml
+    volumes: 
+      - ./prometheus/prometheus.yaml:/etc/prometheus/prometheus.yaml
+    networks: 
+      - loki
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    volumes: 
+      - ./data/grafana/:/var/lib/grafana
+    networks:
+      - loki
+
+  
